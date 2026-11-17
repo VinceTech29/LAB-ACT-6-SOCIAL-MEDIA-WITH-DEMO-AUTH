@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'post.dart';
 
@@ -38,13 +37,12 @@ class _CreatePostSheetState extends State<CreatePostSheet> {
         uri.hasAuthority &&
         (uri.scheme == 'https' || uri.scheme == 'http');
     final isFileUri = uri != null && uri.scheme == 'file';
-    final isLocalPath = File(imageUrl).existsSync() ||
-        RegExp(r'^[a-zA-Z]:[\\/]').hasMatch(imageUrl);
+    final isWindowsDrive = RegExp(r'^[a-zA-Z]:[\\/]').hasMatch(imageUrl);
 
-    if (!isHttp && !isFileUri && !isLocalPath) {
+    if (!isHttp && !isFileUri && !isWindowsDrive) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Enter a valid HTTP or HTTPS image URL or file path.'),
+          content: Text('Enter a valid HTTP or HTTPS image URL.'),
         ),
       );
       return;
@@ -102,8 +100,8 @@ class _CreatePostSheetState extends State<CreatePostSheet> {
               controller: _imageController,
               keyboardType: TextInputType.url,
               decoration: const InputDecoration(
-                labelText: 'Image URL or File Path',
-                hintText: 'https://... or C:\\path\\to\\image.png',
+                labelText: 'Image URL',
+                hintText: 'https://... or image file path',
                 prefixIcon: Icon(Icons.image),
                 border: OutlineInputBorder(),
               ),

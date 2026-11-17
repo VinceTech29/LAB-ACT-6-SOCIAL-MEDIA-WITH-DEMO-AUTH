@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'open_url_stub.dart' if (dart.library.html) 'open_url_web.dart';
 import 'post.dart';
 
 class PostCard extends StatefulWidget {
@@ -42,22 +44,24 @@ class _PostCardState extends State<PostCard> {
   }
 
   Future<File?> _resolveOrCacheImageFile(String rawPathOrUrl) async {
-    String path = rawPathOrUrl.trim();
-    if (path.startsWith('file://')) {
-      final uri = Uri.tryParse(path);
-      if (uri != null) {
-        path = uri.toFilePath();
+    if (kIsWeb) return null;
+
+    try {
+      String path = rawPathOrUrl.trim();
+      if (path.startsWith('file://')) {
+        final uri = Uri.tryParse(path);
+        if (uri != null) {
+          path = uri.toFilePath();
+        }
       }
-    }
 
-    final localFile = File(path);
-    if (localFile.existsSync()) {
-      return localFile;
-    }
+      final localFile = File(path);
+      if (localFile.existsSync()) {
+        return localFile;
+      }
 
-    final uri = Uri.tryParse(rawPathOrUrl);
-    if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
-      try {
+      final uri = Uri.tryParse(rawPathOrUrl);
+      if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
         final cacheDir = Directory(
           '${Directory.systemTemp.path}${Platform.pathSeparator}social_media_images',
         );
@@ -85,15 +89,31 @@ class _PostCardState extends State<PostCard> {
           await cachedFile.writeAsBytes(bytes);
           return cachedFile;
         }
-      } catch (e) {
-        debugPrint('Error caching network image: $e');
       }
+    } catch (e) {
+      debugPrint('Error caching network image: $e');
     }
 
     return null;
   }
 
   Future<void> openInWindowsFileExplorer() async {
+    final raw = widget.post.imageUrl.trim();
+
+    if (kIsWeb) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Opening image location: $raw'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      openUrl(raw);
+      return;
+    }
+
     if (mounted) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -104,7 +124,6 @@ class _PostCardState extends State<PostCard> {
       );
     }
 
-    final raw = widget.post.imageUrl.trim();
     final file = await _resolveOrCacheImageFile(raw);
 
     if (file != null && file.existsSync()) {
@@ -118,13 +137,13 @@ class _PostCardState extends State<PostCard> {
         debugPrint('Failed to launch explorer: $e');
       }
     } else {
-      final folder = Directory(
-        '${Directory.systemTemp.path}${Platform.pathSeparator}social_media_images',
-      );
-      if (!folder.existsSync()) {
-        folder.createSync(recursive: true);
-      }
       try {
+        final folder = Directory(
+          '${Directory.systemTemp.path}${Platform.pathSeparator}social_media_images',
+        );
+        if (!folder.existsSync()) {
+          folder.createSync(recursive: true);
+        }
         await Process.start(
           'explorer.exe',
           [folder.absolute.path],
@@ -138,24 +157,31 @@ class _PostCardState extends State<PostCard> {
 
   Widget _buildImage() {
     final raw = widget.post.imageUrl.trim();
-    String path = raw;
-    if (path.startsWith('file://')) {
-      final uri = Uri.tryParse(path);
-      if (uri != null) {
-        path = uri.toFilePath();
-      }
-    }
+    final isNetworkUrl =
+        raw.startsWith('http://') || raw.startsWith('https://');
 
-    final localFile = File(path);
-    if (localFile.existsSync()) {
-      return Image.file(
-        localFile,
-        width: double.infinity,
-        height: 220,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) =>
-            _buildBrokenImagePlaceholder(),
-      );
+    if (!kIsWeb && !isNetworkUrl) {
+      try {
+        String path = raw;
+        if (path.startsWith('file://')) {
+          final uri = Uri.tryParse(path);
+          if (uri != null) {
+            path = uri.toFilePath();
+          }
+        }
+
+        final localFile = File(path);
+        if (localFile.existsSync()) {
+          return Image.file(
+            localFile,
+            width: double.infinity,
+            height: 220,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) =>
+                _buildBrokenImagePlaceholder(),
+          );
+        }
+      } catch (_) {}
     }
 
     return Image.network(
@@ -228,7 +254,9 @@ class _PostCardState extends State<PostCard> {
             child: MouseRegion(
               cursor: SystemMouseCursors.click,
               child: Tooltip(
-                message: 'Click to open in Windows File Explorer',
+                message: kIsWeb
+                    ? 'Click to open image link'
+                    : 'Click to open in Windows File Explorer',
                 child: Stack(
                   children: [
                     _buildImage(),
@@ -244,18 +272,18 @@ class _PostCardState extends State<PostCard> {
                           color: Colors.black.withValues(alpha: 0.65),
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.folder_open,
                               color: Colors.white,
                               size: 14,
                             ),
-                            SizedBox(width: 4),
+                            const SizedBox(width: 4),
                             Text(
-                              'Open in Explorer',
-                              style: TextStyle(
+                              kIsWeb ? 'Open Link' : 'Open in Explorer',
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w500,

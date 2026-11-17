@@ -80,13 +80,13 @@ void main() {
       'My first Flutter social media post!',
     );
     await tester.enterText(
-      find.widgetWithText(TextField, 'Image URL or File Path'),
+      find.widgetWithText(TextField, 'Image URL'),
       'invalid-url',
     );
     await tester.tap(find.widgetWithText(ElevatedButton, 'Submit Post'));
     await tester.pump();
     expect(
-      find.text('Enter a valid HTTP or HTTPS image URL or file path.'),
+      find.text('Enter a valid HTTP or HTTPS image URL.'),
       findsOneWidget,
     );
     ScaffoldMessenger.of(tester.element(find.byType(CreatePostSheet))).clearSnackBars();
@@ -94,7 +94,7 @@ void main() {
 
     // 5. Submit valid post
     await tester.enterText(
-      find.widgetWithText(TextField, 'Image URL or File Path'),
+      find.widgetWithText(TextField, 'Image URL'),
       'https://picsum.photos/id/20/600/400',
     );
     await tester.tap(find.widgetWithText(ElevatedButton, 'Submit Post'));
@@ -196,7 +196,7 @@ void main() {
       'Second post',
     );
     await tester.enterText(
-      find.widgetWithText(TextField, 'Image URL or File Path'),
+      find.widgetWithText(TextField, 'Image URL'),
       'https://picsum.photos/id/24/600/400',
     );
     await tester.tap(find.widgetWithText(ElevatedButton, 'Submit Post'));
@@ -277,7 +277,7 @@ void main() {
       'Post by MariaClara',
     );
     await tester.enterText(
-      find.widgetWithText(TextField, 'Image URL or File Path'),
+      find.widgetWithText(TextField, 'Image URL'),
       'https://picsum.photos/id/30/600/400',
     );
     await tester.tap(find.widgetWithText(ElevatedButton, 'Submit Post'));
