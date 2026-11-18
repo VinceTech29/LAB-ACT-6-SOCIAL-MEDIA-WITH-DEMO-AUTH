@@ -4,9 +4,14 @@ import 'demo_auth.dart';
 import 'login_screen.dart';
 
 class ProfilePage extends StatelessWidget {
-  const ProfilePage({super.key});
+  final String username;
 
-  void _handleLogout(BuildContext context) {
+  const ProfilePage({
+    super.key,
+    required this.username,
+  });
+
+  void logout(BuildContext context) {
     DemoAuth.logout();
 
     Navigator.of(context).pushAndRemoveUntil(
@@ -21,98 +26,63 @@ class ProfilePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Profile'),
-        actions: [
-          IconButton(
+        title: const Text('Student Profile'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          const CircleAvatar(
+            radius: 50,
+            backgroundColor: Colors.indigo,
+            child: Icon(
+              Icons.person,
+              size: 60,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'LOURDE VINCENT M. PABLO',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Logged in as: $username',
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          const Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: Icon(Icons.badge),
+                  title: Text('Student ID'),
+                  subtitle: Text('553470'),
+                ),
+                ListTile(
+                  leading: Icon(Icons.school),
+                  title: Text('Course and Section'),
+                  subtitle: Text('BSIT — CCE106L (3447)'),
+                ),
+                ListTile(
+                  leading: Icon(Icons.email),
+                  title: Text('Email'),
+                  subtitle: Text('lourdevincentpablo26@gmail.com'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () => logout(context),
             icon: const Icon(Icons.logout),
-            tooltip: 'Logout',
-            onPressed: () => _handleLogout(context),
+            label: const Text('Logout'),
           ),
         ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Center(
-              child: CircleAvatar(
-                radius: 48,
-                backgroundColor: Colors.indigo,
-                child: Icon(
-                  Icons.person,
-                  size: 52,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'LOURDE VINCENT M. PABLO',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'BSIT — CCE106L (3447)',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey[700],
-                  ),
-            ),
-            const SizedBox(height: 24),
-            Card(
-              elevation: 2,
-              clipBehavior: Clip.antiAlias,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Column(
-                children: [
-                  ListTile(
-                    leading: Icon(Icons.person_outline, color: Colors.indigo),
-                    title: Text('Full Name'),
-                    subtitle: Text('LOURDE VINCENT M. PABLO'),
-                  ),
-                  Divider(height: 1),
-                  ListTile(
-                    leading: Icon(Icons.badge_outlined, color: Colors.indigo),
-                    title: Text('Student ID'),
-                    subtitle: Text('553470'),
-                  ),
-                  Divider(height: 1),
-                  ListTile(
-                    leading: Icon(Icons.school_outlined, color: Colors.indigo),
-                    title: Text('Course and Section'),
-                    subtitle: Text('BSIT — CCE106L (3447)'),
-                  ),
-                  Divider(height: 1),
-                  ListTile(
-                    leading: Icon(Icons.email_outlined, color: Colors.indigo),
-                    title: Text('Email Address'),
-                    subtitle: Text('lourdevincentpablo26@gmail.com'),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: () => _handleLogout(context),
-              icon: const Icon(Icons.logout),
-              label: const Text('Logout'),
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.red.shade700,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
