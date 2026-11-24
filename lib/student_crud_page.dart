@@ -14,8 +14,10 @@ class _StudentCrudPageState extends State<StudentCrudPage> {
   final nameController = TextEditingController();
   final courseController = TextEditingController();
 
-  late final CollectionReference<Map<String, dynamic>> students;
-  late final Stream<QuerySnapshot<Map<String, dynamic>>> studentStream;
+  CollectionReference<Map<String, dynamic>>? students;
+  Stream<QuerySnapshot<Map<String, dynamic>>>? studentStream;
+  bool authLoading = true;
+  String? authError;
 
   String? editingId;
   bool saving = false;
@@ -24,12 +26,50 @@ class _StudentCrudPageState extends State<StudentCrudPage> {
   @override
   void initState() {
     super.initState();
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-    students = FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('students');
-    studentStream = students.snapshots();
+    _initFirebase();
+  }
+
+  Future<void> _initFirebase() async {
+    setState(() {
+      authLoading = true;
+      authError = null;
+    });
+
+    try {
+      if (FirebaseAuth.instance.currentUser == null) {
+        await FirebaseAuth.instance.signInAnonymously();
+      }
+
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        final collection = FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('students');
+        if (mounted) {
+          setState(() {
+            students = collection;
+            studentStream = collection.snapshots();
+            authLoading = false;
+            authError = null;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            authLoading = false;
+            authError = 'Firebase User not authenticated.';
+          });
+        }
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          authLoading = false;
+          authError = error.toString();
+        });
+      }
+    }
   }
 
   void showMessage(String message) {
@@ -49,7 +89,7 @@ class _StudentCrudPageState extends State<StudentCrudPage> {
 
   // CREATE or UPDATE
   Future<void> saveStudent() async {
-    if (saving || deleting) return;
+    if (saving || deleting || students == null) return;
     if (!formKey.currentState!.validate()) {
       return;
     }
@@ -67,10 +107,10 @@ class _StudentCrudPageState extends State<StudentCrudPage> {
     try {
       if (id == null) {
         // CREATE: generate a new document.
-        await students.add(data);
+        await students!.add(data);
       } else {
         // UPDATE: modify the selected document.
-        await students.doc(id).update(data);
+        await students!.doc(id).update(data);
       }
 
       if (!mounted) return;
@@ -107,7 +147,7 @@ class _StudentCrudPageState extends State<StudentCrudPage> {
   Future<void> deleteStudent(
     QueryDocumentSnapshot<Map<String, dynamic>> document,
   ) async {
-    if (saving || deleting) return;
+    if (saving || deleting || students == null) return;
 
     setState(() {
       deleting = true;
@@ -142,7 +182,7 @@ class _StudentCrudPageState extends State<StudentCrudPage> {
 
       if (!mounted || confirmed != true) return;
 
-      await students.doc(document.id).delete();
+      await students!.doc(document.id).delete();
 
       if (!mounted) return;
 
@@ -189,138 +229,192 @@ class _StudentCrudPageState extends State<StudentCrudPage> {
       appBar: AppBar(
         title: const Text('Student Records'),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Text(
-            editingId == null ? 'Add Student' : 'Edit Student',
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Form(
-            key: formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextFormField(
-                  controller: nameController,
-                  enabled: !busy,
-                  validator: validateText,
-                  decoration: const InputDecoration(
-                    labelText: 'Student Name',
-                    prefixIcon: Icon(Icons.person),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: courseController,
-                  enabled: !busy,
-                  validator: validateText,
-                  decoration: const InputDecoration(
-                    labelText: 'Course',
-                    prefixIcon: Icon(Icons.school),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: busy ? null : saveStudent,
-                  icon: const Icon(Icons.save),
-                  label: Text(
-                    saving
-                        ? 'Saving...'
-                        : editingId == null
-                            ? 'Add Student'
-                            : 'Update Student',
-                  ),
-                ),
-                if (editingId != null)
-                  TextButton(
-                    onPressed: busy ? null : clearForm,
-                    child: const Text('Cancel Edit'),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 28),
-          const Text(
-            'Saved Students',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
-          // READ: display live Firestore documents.
-          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: studentStream,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return const Text(
-                  'Unable to load records. '
-                  'Check your connection and database rules.',
-                );
-              }
-
-              if (!snapshot.hasData) {
-                return const Center(
-                  child: CircularProgressIndicator(),
-                );
-              }
-
-              final documents = snapshot.data!.docs;
-
-              if (documents.isEmpty) {
-                return const Text(
-                  'No student records yet.',
-                );
-              }
-
-              return Column(
-                children: documents.map((document) {
-                  final data = document.data();
-                  return Card(
-                    key: ValueKey(document.id),
-                    child: ListTile(
-                      title: Text(data['name'] as String),
-                      subtitle: Text(
-                        data['course'] as String,
+      body: authLoading
+          ? const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Connecting to Firebase...'),
+                ],
+              ),
+            )
+          : authError != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Card(
+                      color: Colors.amber.shade50,
+                      child: Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.warning_amber_rounded,
+                              size: 48,
+                              color: Colors.orange,
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Firebase Setup Required',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Anonymous Authentication or Firestore Database has not been enabled in your Firebase Console yet.',
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton.icon(
+                              onPressed: _initFirebase,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Retry Connection'),
+                            ),
+                          ],
+                        ),
                       ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
+                    ),
+                  ),
+                )
+              : ListView(
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    Text(
+                      editingId == null ? 'Add Student' : 'Edit Student',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Form(
+                      key: formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          IconButton(
-                            tooltip: 'Edit',
-                            onPressed:
-                                busy ? null : () => editStudent(document),
-                            icon: const Icon(
-                              Icons.edit,
-                              color: Colors.blue,
+                          TextFormField(
+                            controller: nameController,
+                            enabled: !busy,
+                            validator: validateText,
+                            decoration: const InputDecoration(
+                              labelText: 'Student Name',
+                              prefixIcon: Icon(Icons.person),
+                              border: OutlineInputBorder(),
                             ),
                           ),
-                          IconButton(
-                            tooltip: 'Delete',
-                            onPressed:
-                                busy ? null : () => deleteStudent(document),
-                            icon: const Icon(
-                              Icons.delete,
-                              color: Colors.red,
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: courseController,
+                            enabled: !busy,
+                            validator: validateText,
+                            decoration: const InputDecoration(
+                              labelText: 'Course',
+                              prefixIcon: Icon(Icons.school),
+                              border: OutlineInputBorder(),
                             ),
                           ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: busy ? null : saveStudent,
+                            icon: const Icon(Icons.save),
+                            label: Text(
+                              saving
+                                  ? 'Saving...'
+                                  : editingId == null
+                                      ? 'Add Student'
+                                      : 'Update Student',
+                            ),
+                          ),
+                          if (editingId != null)
+                            TextButton(
+                              onPressed: busy ? null : clearForm,
+                              child: const Text('Cancel Edit'),
+                            ),
                         ],
                       ),
                     ),
-                  );
-                }).toList(),
-              );
-            },
-          ),
-        ],
-      ),
+                    const SizedBox(height: 28),
+                    const Text(
+                      'Saved Students',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // READ: display live Firestore documents.
+                    StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: studentStream,
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return const Text(
+                            'Unable to load records. '
+                            'Check your connection and database rules.',
+                          );
+                        }
+
+                        if (!snapshot.hasData) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+
+                        final documents = snapshot.data!.docs;
+
+                        if (documents.isEmpty) {
+                          return const Text(
+                            'No student records yet.',
+                          );
+                        }
+
+                        return Column(
+                          children: documents.map((document) {
+                            final data = document.data();
+                            return Card(
+                              key: ValueKey(document.id),
+                              child: ListTile(
+                                title: Text(data['name'] as String),
+                                subtitle: Text(
+                                  data['course'] as String,
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      tooltip: 'Edit',
+                                      onPressed: busy
+                                          ? null
+                                          : () => editStudent(document),
+                                      icon: const Icon(
+                                        Icons.edit,
+                                        color: Colors.blue,
+                                      ),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'Delete',
+                                      onPressed: busy
+                                          ? null
+                                          : () => deleteStudent(document),
+                                      icon: const Icon(
+                                        Icons.delete,
+                                        color: Colors.red,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        );
+                      },
+                    ),
+                  ],
+                ),
     );
   }
 }
